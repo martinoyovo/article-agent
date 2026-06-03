@@ -228,6 +228,15 @@ function renderComparison(f: {
   return frame(H, blocks);
 }
 
+// Compact large numbers so a value stays short and never overflows the figure.
+function compactNum(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(abs % 1e9 === 0 ? 0 : 1) + "B";
+  if (abs >= 1e6) return (n / 1e6).toFixed(abs % 1e6 === 0 ? 0 : 1) + "M";
+  if (abs >= 1e3) return (n / 1e3).toFixed(abs % 1e3 === 0 ? 0 : 1) + "K";
+  return String(n);
+}
+
 function renderBar(f: { title?: string; bars: { label: string; value: number }[] }): string {
   const bars = f.bars.slice(0, 5);
   const pad = 40;
@@ -235,7 +244,7 @@ function renderBar(f: { title?: string; bars: { label: string; value: number }[]
   const barH = 46;
   const gap = 20;
   const trackX = 300;
-  const barMaxW = FIG_W - trackX - 96;
+  const barMaxW = FIG_W - trackX - 80;
   const maxVal = Math.max(...bars.map((b) => b.value), 1);
   const cycle = [PALETTE.green, PALETTE.coral, PALETTE.lavender];
   const rows = bars
@@ -243,12 +252,18 @@ function renderBar(f: { title?: string; bars: { label: string; value: number }[]
       const y = startY + i * (barH + gap);
       const fillW = Math.max(2, Math.round((b.value / maxVal) * barMaxW));
       const label = wrapWords(b.label, 20, 1);
+      const valStr = compactNum(b.value);
+      const valW = valStr.length * 20 * 0.62;
+      // Put the value inside the bar (white, right-aligned) when the fill is
+      // wide enough; otherwise just past a short bar. Never past the figure.
+      const inside = fillW > valW + 28;
+      const valText = inside
+        ? `<text x="${trackX + fillW - 14}" y="${y + 30}" ${FONT} font-size="20" font-weight="700" fill="${PALETTE.bg}" text-anchor="end">${escapeXml(valStr)}</text>`
+        : `<text x="${trackX + fillW + 12}" y="${y + 30}" ${FONT} font-size="20" font-weight="700" fill="${PALETTE.ink}">${escapeXml(valStr)}</text>`;
       return `${svgText(40, y + 30, label, 22, 600, PALETTE.ink, 0)}
   <rect x="${trackX}" y="${y}" width="${barMaxW}" height="${barH}" fill="${PALETTE.track}"/>
   <rect x="${trackX}" y="${y}" width="${fillW}" height="${barH}" fill="${cycle[i % 3]}"/>
-  <text x="${trackX + fillW + 12}" y="${y + 30}" ${FONT} font-size="20" font-weight="700" fill="${PALETTE.ink}">${escapeXml(
-    String(b.value),
-  )}</text>`;
+  ${valText}`;
     })
     .join("\n  ");
   const H = startY + bars.length * (barH + gap) - gap + pad;
