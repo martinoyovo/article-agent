@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient, MODELS, textOf, parseJson } from "./claude.js";
+import { createClient, MODELS, textOf, parseJson, cachedSystem } from "./claude.js";
 import { VOICE, stripEmDashes } from "./voice.js";
 import { renderCover, renderFigure, type Figure } from "./design.js";
 
@@ -75,9 +75,10 @@ async function outline(
   const msg = await client.messages.create({
     model: MODELS.fast,
     max_tokens: 1800,
-    system:
-      VOICE +
+    system: cachedSystem(
+      VOICE,
       '\n\nReturn ONLY JSON: {"title":"...","subtitle":"...","sections":[{"h":"section heading","beats":["concrete beat","concrete beat"]}]}',
+    ),
     messages: [
       {
         role: "user",
@@ -104,12 +105,13 @@ async function draft(
   const msg = await client.messages.create({
     model: MODELS.draft,
     max_tokens: 8000,
-    system:
-      VOICE +
+    system: cachedSystem(
+      VOICE,
       `\n\nWrite the full article in Markdown. Target ${lengthWords} words. ` +
-      `Use inline [N] citations that map to the "### Sources" list. ` +
-      `Source format: [N] Source name, short description. <URL>. ` +
-      `Use ONLY the real URLs provided in the research. No em dashes anywhere.`,
+        `Use inline [N] citations that map to the "### Sources" list. ` +
+        `Source format: [N] Source name, short description. <URL>. ` +
+        `Use ONLY the real URLs provided in the research. No em dashes anywhere.`,
+    ),
     messages: [
       {
         role: "user",
@@ -128,12 +130,13 @@ async function critic(client: Anthropic, article: string, onProgress: Progress):
   const msg = await client.messages.create({
     model: MODELS.fast,
     max_tokens: 8000,
-    system:
-      VOICE +
+    system: cachedSystem(
+      VOICE,
       "\n\nYou are a style editor. Rewrite the article to fix every violation of the rules above: " +
-      "remove ALL em dashes, ensure inline [N] markers map to the Sources list, and ensure each source " +
-      "is formatted exactly as [N] Source name, description. <URL>. " +
-      "Keep the author's voice and every fact and citation intact. Return ONLY the corrected Markdown.",
+        "remove ALL em dashes, ensure inline [N] markers map to the Sources list, and ensure each source " +
+        "is formatted exactly as [N] Source name, description. <URL>. " +
+        "Keep the author's voice and every fact and citation intact. Return ONLY the corrected Markdown.",
+    ),
     messages: [{ role: "user", content: article }],
   });
   return stripEmDashes(textOf(msg));
