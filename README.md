@@ -6,9 +6,9 @@ Bring your own Anthropic API key. The hosted version never stores it. The voice 
 
 ## Demo
 
-[![Watch the article-agent demo](docs/demo-poster.png)](https://github.com/martinoyovo/article-agent/blob/main/docs/demo.mp4)
+[![article-agent demo](docs/demo.gif)](https://github.com/martinoyovo/article-agent/blob/main/docs/demo.mp4)
 
-A short walk-through: enter a topic, watch the six-step pipeline run, and get a cited article with a cover and in-article figures. Click the image to play.
+Enter a topic, watch the six-step pipeline run, and get a cited article with a cover and in-article figures. The preview above is sped up and silent. Click it for the [full video with audio](https://github.com/martinoyovo/article-agent/blob/main/docs/demo.mp4).
 
 ## Use it
 
