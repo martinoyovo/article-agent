@@ -77,7 +77,10 @@ Bring-your-own-key means abuse spends the caller's tokens, not the host's. The r
 - More figure templates (timelines, callout quotes) and embedded Inter for pixel-exact PNG text.
 - Companion deliverables: tweet thread, LinkedIn caption, platform variants.
 - Async job pattern so it runs on any plan without timeout limits.
-- Package the voice rules as a Claude skill so the same logic runs in Claude Code.
+
+## House voice as a Claude skill
+
+The same voice rules in `src/voice.ts` are packaged as a Claude Code skill at [`.claude/skills/house-voice`](.claude/skills/house-voice/SKILL.md). Open this repo in Claude Code and it loads automatically when you draft or edit long-form prose, so you write in the house voice without the pipeline. To use it in any project, copy the `house-voice` folder into `~/.claude/skills/`. Keep it in sync with `src/voice.ts` when the rules change.
 
 ## License
 
