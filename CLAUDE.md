@@ -9,10 +9,10 @@ Project context for Claude Code. Read this before making changes.
 1. **research** (`src/pipeline.ts`) — real web search via the Anthropic server-side `web_search` tool, returns cited findings with live URLs.
 2. **outline** — shapes the spine in house structure.
 3. **draft** — full article in voice, with inline `[N]` citations.
-4. **graphics** — a self-contained cover SVG in the house palette. Runs concurrently with the draft (both depend only on outline + research). Has a deterministic on-brand fallback so an image always ships. The SVG is sanitized server-side (no script/external refs) since the UI renders it inline.
+4. **graphics** — the cover. The model never draws SVG (it is bad at spatial layout, which produced overlapping garbage). It returns only an optional headline stat as plain text (`{stat, statLabel}`); `renderCover()` then lays out the whole SVG deterministically. Title font size adapts to fit <=4 lines, the title column narrows when a stat panel is present, and all decoration lives in fixed right/corner margins, so nothing can ever overlap or clip. Runs concurrently with the draft.
 5. **critic** — a style editor pass that enforces the rules and rewrites violations.
 
-The cover comes back as `coverSvg` on the result. The UI shows it inline and rasterizes it to a 2400px PNG in the browser for download (no server-side image library, so nothing native to bundle on serverless).
+The cover comes back as `coverSvg` on the result. The UI shows it inline and rasterizes it to a 2400px PNG in the browser for download (no server-side image library, so nothing native to bundle on serverless). Rule for any future graphics (including in-article diagrams): the model supplies content/structured data only, code owns every coordinate.
 
 The orchestration is plain code; Claude is called only for the cognitive steps. This is deliberate: deterministic control flow, model for judgment.
 
