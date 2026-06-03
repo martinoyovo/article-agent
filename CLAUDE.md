@@ -22,8 +22,9 @@ The pipeline takes an optional `apiKey` per request. The web UI and both endpoin
 - `src/pipeline.ts` — the agent. The four steps and `generateArticle()`. Each step takes the per-request client.
 - `src/voice.ts` — the encoded house style and the em-dash safety net. **This is the part that makes the output the author's, not generic. Treat it as the most important file.** It is meant to lift into a Claude skill later.
 - `src/claude.ts` — `createClient(apiKey?)`, model config, JSON parsing helpers.
+- `src/rateLimit.ts` — per-IP fixed-window rate limiter, dependency-free. Shared by both endpoints.
 - `src/server.ts` — standalone Node server (`/`, `/api/generate`, `/health`), host-agnostic. Serves the UI.
-- `api/generate.ts` — Vercel serverless endpoint, streaming SSE.
+- `api/generate.ts` — Vercel serverless endpoint, streaming SSE. Uses local http-based types, not `@vercel/node` (removed to drop its CVE-bearing dev deps).
 - `public/index.html` — the web UI. Single file, house palette, key stored in localStorage only.
 
 ## Conventions
@@ -50,12 +51,12 @@ Long-running hosts (Railway/Render/Fly): build `npm install && npm run build`, s
 ## Guardrails
 
 - Never commit `.env`, `node_modules`, or `dist` (already in `.gitignore`).
-- The key is BYOK, so a public deploy does not spend the author's tokens. Still add a rate limit before heavy public exposure to avoid abuse of the compute itself.
+- The key is BYOK, so a public deploy does not spend the author's tokens. Compute abuse is capped by a per-IP rate limiter (`src/rateLimit.ts`, default 5/60s). It is in-memory, so per-instance on serverless, best-effort. For global limits use Vercel Firewall rate limiting or a shared store (Upstash Redis).
 
 ## Roadmap (pick these up)
 
 1. **Graphics step** — generate SVGs in the house palette (coral #FF7A5C, green #5FB78A, lavender #A78ECC, Inter font, sharp corners, filled triangle arrowheads) and render to PNG at 2400px via `@resvg/resvg-js` (serverless-safe, embeds fonts). Do not use cairosvg (Python, painful in serverless).
 2. **Companion deliverables** — tweet thread (10 to 12), LinkedIn caption mirroring the intro verbatim, IG/X/WhatsApp variants.
 3. **Async job pattern** — kick off, store, poll. Removes the timeout ceiling so it runs on any plan.
-4. **Rate limit** before heavy public exposure.
+4. **Global rate limit** — the in-memory per-IP limiter is best-effort on serverless. For hard limits add Vercel Firewall rate limiting or back `rateLimit.ts` with Upstash Redis.
 5. **Package `voice.ts` as a Claude skill** so the same rules run inside Claude Code.

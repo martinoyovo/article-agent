@@ -1,13 +1,33 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { generateArticle } from "../src/pipeline.js";
+import { rateLimit, clientKey } from "../src/rateLimit.js";
+
+// Minimal local types for the Vercel Node handler. We only use the few members
+// below, so we extend Node's own http types instead of depending on
+// @vercel/node (a dev-only package whose transitive deps carry CVEs).
+type VercelRequest = IncomingMessage & { body?: unknown };
+type VercelResponse = ServerResponse & {
+  status: (code: number) => VercelResponse;
+  json: (body: unknown) => void;
+};
 
 // Allow the pipeline time to run. Requires a Vercel plan that permits this
-// duration (Hobby caps at 60s, which is not enough; Pro allows up to 300s).
+// duration. With Fluid Compute (default on), the free Hobby plan allows 300s.
 export const config = { maxDuration: 300 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "POST only" });
+    return;
+  }
+
+  // Rate limit before doing any work or opening the stream.
+  const gate = rateLimit(clientKey(req.headers["x-forwarded-for"], req.socket?.remoteAddress));
+  res.setHeader("X-RateLimit-Limit", String(gate.limit));
+  res.setHeader("X-RateLimit-Remaining", String(gate.remaining));
+  if (!gate.ok) {
+    res.setHeader("Retry-After", String(gate.retryAfterSec));
+    res.status(429).json({ error: `Rate limit exceeded. Try again in ${gate.retryAfterSec}s.` });
     return;
   }
 

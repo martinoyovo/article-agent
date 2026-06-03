@@ -55,10 +55,16 @@ Timeouts: the full pipeline takes a couple of minutes. `maxDuration` is 300s in 
 | `ANTHROPIC_API_KEY` | (optional) | Fallback key. Leave unset on public deploys so callers bring their own. |
 | `DRAFT_MODEL` | `claude-sonnet-4-6` | model for the draft step |
 | `FAST_MODEL` | `claude-haiku-4-5-20251001` | research, outline, critic |
+| `RATE_LIMIT_MAX` | `5` | requests allowed per IP per window |
+| `RATE_LIMIT_WINDOW_SEC` | `60` | rate limit window in seconds |
 
 ## Cost note
 
 Each run is four model calls plus up to 6 web searches, billed to whichever key made the request. Research, outline, and critic use the fast model; only the draft uses the stronger one.
+
+## Rate limiting
+
+Bring-your-own-key means abuse spends the caller's tokens, not the host's. The remaining concern is compute, so each endpoint caps requests per IP (default 5 per 60s, tunable above). The limiter is in process memory, so on serverless it is per-instance, not global. That stops casual hammering. For hard, global limits in production, add [Vercel Firewall rate limiting](https://vercel.com/docs/security/vercel-waf/rate-limiting) or back the limiter with a shared store (Upstash Redis).
 
 ## Roadmap
 

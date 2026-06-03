@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { generateArticle } from "./pipeline.js";
+import { rateLimit, clientKey } from "./rateLimit.js";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -39,6 +40,18 @@ http
     }
 
     if (req.method === "POST" && (req.url === "/generate" || req.url === "/api/generate")) {
+      const gate = rateLimit(clientKey(req.headers["x-forwarded-for"], req.socket.remoteAddress));
+      if (!gate.ok) {
+        res.writeHead(429, {
+          "content-type": "application/json",
+          "retry-after": String(gate.retryAfterSec),
+          "x-ratelimit-limit": String(gate.limit),
+          "x-ratelimit-remaining": "0",
+        });
+        res.end(JSON.stringify({ error: `Rate limit exceeded. Try again in ${gate.retryAfterSec}s.` }));
+        return;
+      }
+
       let body = "";
       req.on("data", (c) => (body += c));
       req.on("end", async () => {
@@ -53,6 +66,8 @@ http
             "content-type": "text/event-stream",
             "cache-control": "no-cache",
             connection: "keep-alive",
+            "x-ratelimit-limit": String(gate.limit),
+            "x-ratelimit-remaining": String(gate.remaining),
           });
           const send = (event: string, data: unknown) =>
             res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
