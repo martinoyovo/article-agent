@@ -13,7 +13,7 @@ Voice and rules, all mandatory:
 
 Citations:
 - Use inline [N] markers in the body that map to a "### Sources" list at the end.
-- Each source entry, exactly: [N] Source name, short description. <URL> (accessed DATE).
+- Each source entry, exactly: [N] Source name, short description. <URL>
 - Consolidate to one entry per source. Never invent a URL.
 
 Structure of a finished article:

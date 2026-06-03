@@ -35,7 +35,3 @@ export function parseJson<T>(raw: string): T {
   if (start >= 0 && end >= 0) s = s.slice(start, end + 1);
   return JSON.parse(s) as T;
 }
-
-export function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}

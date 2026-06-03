@@ -35,7 +35,7 @@ The pipeline takes an optional `apiKey` per request. The web UI and both endpoin
 - TypeScript, ESM (`"type": "module"`, NodeNext). Import local files with the `.js` extension.
 - The pipeline is a pure async function with a progress callback. Keep it runtime-agnostic. Do not couple it to Vercel or to the standalone server.
 - **Output rule, non-negotiable: never emit em dashes.** `voice.ts` enforces this both in the prompt and mechanically via `stripEmDashes`.
-- Citations are inline `[N]` mapping to a `### Sources` list, one entry per source, format `[N] Source name, description. <URL> (accessed DATE)`. Never invent URLs.
+- Citations are inline `[N]` mapping to a `### Sources` list, one entry per source, format `[N] Source name, description. <URL>`. Never invent URLs.
 - Models are env-configurable. Do not hardcode model IDs in new code; read from `MODELS` in `src/claude.ts`.
 - The endpoint path is `/api/generate` on both the server and Vercel, so the UI posts to one path everywhere.
 
