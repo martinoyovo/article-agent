@@ -1,0 +1,38 @@
+{
+  "name": "article-agent",
+  "version": "0.1.0",
+  "description": "An open-source agent that researches and writes articles in your house voice. Real web research with citations, an outline, a draft, and a style critic. Bring your own Anthropic API key.",
+  "type": "module",
+  "license": "MIT",
+  "author": "martinoyovo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/martinoyovo/article-agent.git"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "anthropic",
+    "content",
+    "writing",
+    "web-search",
+    "vercel"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/src/server.js",
+    "dev": "node --import tsx src/server.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@vercel/node": "^5.8.9",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
