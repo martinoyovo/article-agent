@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient, MODELS, textOf, parseJson } from "./claude.js";
 import { VOICE, stripEmDashes } from "./voice.js";
+import { renderCover, renderFigure, type Figure } from "./design.js";
 
 export interface ArticleInput {
   topic: string;
@@ -34,6 +35,7 @@ export interface ArticleResult {
   markdown: string;
   sources: Finding[];
   coverSvg: string;
+  figures: { anchor: string; svg: string }[];
 }
 
 export type Progress = (step: string, message: string) => void;
@@ -178,98 +180,74 @@ async function graphics(
   return renderCover(o.title, o.subtitle || r.framing, stat, statLabel);
 }
 
-function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// 6. Figures. After the article is final, the model decides whether any
+// diagram genuinely helps and, if so, picks a template and fills its text
+// slots. It may return none. renderFigure() draws each deterministically and
+// each is inserted into the markdown right after its section heading.
+const FIGURE_PLANNER = `You decide what visuals, if any, an article needs. Do NOT add a figure for its own sake; include one only where it genuinely aids understanding. Return 0 to 3 figures total.
+
+Read the article. For each figure, choose the template that fits the content and copy the exact text of the section heading it belongs under into "anchor".
+
+Templates and fields:
+- stat: one striking number. {"type":"stat","anchor":"...","stat":"79%","label":"of agent deployments fail"} (stat max 6 chars, label max 8 words)
+- steps: an ordered process of 2 to 5 short steps. {"type":"steps","anchor":"...","title":"optional","steps":["...","..."]} (each step max 10 words)
+- comparison: two sides. {"type":"comparison","anchor":"...","leftTitle":"...","leftPoints":["..."],"rightTitle":"...","rightPoints":["..."]} (up to 4 points per side, each max 8 words)
+- bar: compare 2 to 5 quantities. {"type":"bar","anchor":"...","title":"optional","bars":[{"label":"...","value":42}]} (numeric values only)
+
+Return ONLY JSON: {"figures":[ ... ]}. If nothing helps, return {"figures":[]}. No prose, no code fences.`;
+
+async function figures(
+  client: Anthropic,
+  markdown: string,
+  onProgress: Progress,
+): Promise<{ markdown: string; figures: { anchor: string; svg: string }[] }> {
+  onProgress("figures", "Designing diagrams where they help...");
+  try {
+    const msg = await client.messages.create({
+      model: MODELS.fast,
+      max_tokens: 1500,
+      system: FIGURE_PLANNER,
+      messages: [{ role: "user", content: markdown }],
+    });
+    const plan = parseJson<{ figures: Figure[] }>(textOf(msg));
+    const planned = Array.isArray(plan.figures) ? plan.figures.slice(0, 3) : [];
+
+    let md = markdown;
+    const out: { anchor: string; svg: string }[] = [];
+    for (const f of planned) {
+      const svg = renderFigure(f);
+      if (!svg) continue;
+      md = insertAfterHeading(md, f.anchor, svg);
+      out.push({ anchor: f.anchor, svg });
+    }
+    return { markdown: md, figures: out };
+  } catch {
+    // Figures are optional. On any failure, ship the article without them.
+    return { markdown, figures: [] };
+  }
 }
 
-// Greedy word wrap to a character budget, capped at maxLines.
-function wrapWords(text: string, perLine: number, maxLines: number): string[] {
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of (text || "").split(/\s+/)) {
-    if (cur && (cur + " " + w).length > perLine) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = cur ? cur + " " + w : w;
+// Insert an SVG block after the first heading that matches the anchor text.
+// Falls back to placing it before the Sources list, then at the end.
+function insertAfterHeading(md: string, anchor: string, svg: string): string {
+  const block = `\n\n<figure class="article-figure">\n${svg}\n</figure>\n`;
+  const norm = (s: string) => s.replace(/[#*_`]/g, "").trim().toLowerCase();
+  const target = norm(anchor);
+  const lines = md.split("\n");
+  if (target) {
+    for (let i = 0; i < lines.length; i++) {
+      if (/^#{1,6}\s/.test(lines[i]) && norm(lines[i]).includes(target)) {
+        lines.splice(i + 1, 0, block);
+        return lines.join("\n");
+      }
     }
   }
-  if (cur) lines.push(cur);
-  return lines.slice(0, maxLines);
-}
-
-// Largest font size at which the title fits in <=4 lines in the given column.
-// Inter bold runs roughly 0.56 em per character.
-function layoutTitle(title: string, colW: number): { size: number; lines: string[] } {
-  for (const size of [76, 68, 60, 52]) {
-    const perLine = Math.max(6, Math.floor(colW / (size * 0.56)));
-    const lines = wrapWords(title, perLine, 6);
-    if (lines.length <= 4) return { size, lines };
+  const srcIdx = lines.findIndex((l) => /^#{1,6}\s+sources/i.test(l));
+  if (srcIdx >= 0) {
+    lines.splice(srcIdx, 0, block);
+    return lines.join("\n");
   }
-  const size = 48;
-  const perLine = Math.max(6, Math.floor(colW / (size * 0.56)));
-  return { size, lines: wrapWords(title, perLine, 4) };
-}
-
-// Fully deterministic cover. The model supplies only text; this owns every
-// coordinate. Decoration lives strictly in the right margin and corners, and
-// the title column is narrowed when a stat panel is present, so nothing can
-// collide. Title and subtitle are vertically centered as one block.
-export function renderCover(
-  title: string,
-  subtitle: string,
-  stat: string | null,
-  statLabel: string | null,
-): string {
-  const W = 1200;
-  const H = 630;
-  const M = 80;
-  const hasStat = !!(stat && statLabel);
-  const colW = hasStat ? 540 : 760;
-
-  const { size, lines } = layoutTitle(title, colW);
-  const lh = Math.round(size * 1.1);
-  const subLines = wrapWords(subtitle, Math.floor(colW / 13), 2);
-
-  const titleBlockH = (lines.length - 1) * lh;
-  const subBlockH = (subLines.length - 1) * 34;
-  const totalH = titleBlockH + 56 + subBlockH;
-  const titleTop = Math.round((H - totalH) / 2) + Math.round(size * 0.34);
-
-  const titleTspans = lines
-    .map((l, i) => `<tspan x="${M}" dy="${i === 0 ? 0 : lh}">${escapeXml(l)}</tspan>`)
-    .join("");
-  const subStartY = titleTop + titleBlockH + 56;
-  const subTspans = subLines
-    .map((l, i) => `<tspan x="${M}" dy="${i === 0 ? 0 : 34}">${escapeXml(l)}</tspan>`)
-    .join("");
-
-  const decor = hasStat
-    ? `<polygon points="1092,72 1148,104 1092,136" fill="#A78ECC"/>`
-    : `<rect x="900" y="118" width="150" height="150" fill="#5FB78A"/>
-  <rect x="978" y="196" width="150" height="150" fill="#FF7A5C" opacity="0.92"/>
-  <polygon points="900,430 992,476 900,522" fill="#A78ECC"/>`;
-
-  let statPanel = "";
-  if (hasStat) {
-    const labelTspans = wrapWords(statLabel!, 22, 3)
-      .map((l, i) => `<tspan x="700" dy="${i === 0 ? 0 : 34}">${escapeXml(l)}</tspan>`)
-      .join("");
-    statPanel = `<rect x="660" y="150" width="460" height="372" fill="#1C1B22"/>
-  <text x="700" y="322" font-family="Inter, system-ui, sans-serif" font-size="108" font-weight="700" fill="#FF7A5C">${escapeXml(
-    stat!,
-  )}</text>
-  <text x="700" y="388" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="600" fill="#FAF9FB">${labelTspans}</text>`;
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-  <rect width="${W}" height="${H}" fill="#FAF9FB"/>
-  <rect x="0" y="0" width="${W}" height="12" fill="#FF7A5C"/>
-  ${decor}
-  ${statPanel}
-  <text x="${M}" y="${titleTop}" font-family="Inter, system-ui, sans-serif" font-size="${size}" font-weight="700" fill="#1C1B22" letter-spacing="-0.5">${titleTspans}</text>
-  <text x="${M}" y="${subStartY}" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="500" fill="#6B6975">${subTspans}</text>
-</svg>`;
+  return md + block;
 }
 
 export async function generateArticle(
@@ -289,7 +267,17 @@ export async function generateArticle(
     graphics(client, input.topic, r, o, onProgress),
   ]);
   const final = await critic(client, d, onProgress);
+  // Plan and place diagrams last, on the finished article, so anchors match
+  // the final headings and the critic cannot mangle inserted SVG.
+  const withFigures = await figures(client, final, onProgress);
 
   onProgress("done", "Article ready.");
-  return { title: o.title, subtitle: o.subtitle, markdown: final, sources: r.findings, coverSvg };
+  return {
+    title: o.title,
+    subtitle: o.subtitle,
+    markdown: withFigures.markdown,
+    sources: r.findings,
+    coverSvg,
+    figures: withFigures.figures,
+  };
 }

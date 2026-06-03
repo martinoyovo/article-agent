@@ -199,6 +199,57 @@
       .tools button:hover {
         background: #9579c2;
       }
+      .article-figure {
+        margin: 28px 0;
+      }
+      .article-figure svg,
+      .fig-preview svg {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .figures {
+        display: none;
+        margin-top: 40px;
+      }
+      .fig-h {
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin: 0 0 16px;
+      }
+      .fig-item {
+        border: 1px solid var(--line);
+        background: #fff;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .fig-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .fig-label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .fig-btns {
+        display: flex;
+        gap: 10px;
+      }
+      .fig-btns button {
+        background: var(--green);
+        font-size: 13px;
+        padding: 7px 12px;
+      }
+      .fig-btns button:hover {
+        background: #4ea577;
+      }
       footer {
         margin-top: 48px;
         color: var(--muted);
@@ -262,6 +313,8 @@
         <button id="download" type="button">Download .md</button>
       </div>
 
+      <div class="figures" id="figureList"></div>
+
       <footer>
         Open source, MIT.
         <a href="https://github.com/martinoyovo/article-agent" target="_blank" rel="noreferrer">
@@ -279,6 +332,7 @@
         draft: "Writing the draft",
         graphics: "Designing the cover",
         critic: "Enforcing the house voice",
+        figures: "Designing diagrams",
         done: "Done",
       };
 
@@ -290,6 +344,7 @@
 
       let lastMarkdown = "";
       let lastCoverSvg = "";
+      let lastFigures = [];
 
       function renderProgress(active) {
         const box = $("progress");
@@ -322,6 +377,7 @@
         $("tools").style.display = "none";
         $("cover").style.display = "none";
         $("coverTools").style.display = "none";
+        $("figureList").style.display = "none";
         $("go").disabled = true;
         renderProgress("research");
 
@@ -383,6 +439,57 @@
         $("article").innerHTML = marked.parse(lastMarkdown);
         $("article").style.display = "block";
         $("tools").style.display = "flex";
+        showFigures(data.figures || []);
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"]/g, (c) =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+        );
+      }
+
+      // List each generated figure with its own PNG/SVG download, labelled by
+      // the section it sits under, so you can drop it into your own article.
+      function showFigures(figs) {
+        lastFigures = figs;
+        const box = $("figureList");
+        if (!figs.length) {
+          box.style.display = "none";
+          box.innerHTML = "";
+          return;
+        }
+        box.style.display = "block";
+        box.innerHTML =
+          '<h3 class="fig-h">Figures</h3>' +
+          figs
+            .map(
+              (f, i) => `<div class="fig-item">
+              <div class="fig-preview">${f.svg}</div>
+              <div class="fig-actions">
+                <span class="fig-label">Under: ${escapeHtml(f.anchor)}</span>
+                <span class="fig-btns">
+                  <button data-i="${i}" data-fmt="png" type="button">Download PNG</button>
+                  <button data-i="${i}" data-fmt="svg" type="button">Download SVG</button>
+                </span>
+              </div>
+            </div>`,
+            )
+            .join("");
+        box.querySelectorAll("button").forEach((b) =>
+          b.addEventListener("click", async () => {
+            const f = lastFigures[Number(b.dataset.i)];
+            const n = Number(b.dataset.i) + 1;
+            if (b.dataset.fmt === "svg") {
+              downloadBlob(new Blob([f.svg], { type: "image/svg+xml" }), `figure-${n}.svg`);
+            } else {
+              try {
+                downloadBlob(await svgToPng(f.svg, 2000), `figure-${n}.png`);
+              } catch {
+                showError("Could not render that figure as PNG. The SVG download works.");
+              }
+            }
+          }),
+        );
       }
 
       function downloadBlob(blob, name) {

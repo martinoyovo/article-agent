@@ -4,15 +4,16 @@ Project context for Claude Code. Read this before making changes.
 
 ## What this is
 
-`article-agent` is an open-source agent that researches and writes articles in the author's house voice. It runs a deterministic five-step pipeline:
+`article-agent` is an open-source agent that researches and writes articles in the author's house voice. It runs a deterministic six-step pipeline:
 
 1. **research** (`src/pipeline.ts`) — real web search via the Anthropic server-side `web_search` tool, returns cited findings with live URLs.
 2. **outline** — shapes the spine in house structure.
 3. **draft** — full article in voice, with inline `[N]` citations.
-4. **graphics** — the cover. The model never draws SVG (it is bad at spatial layout, which produced overlapping garbage). It returns only an optional headline stat as plain text (`{stat, statLabel}`); `renderCover()` then lays out the whole SVG deterministically. Title font size adapts to fit <=4 lines, the title column narrows when a stat panel is present, and all decoration lives in fixed right/corner margins, so nothing can ever overlap or clip. Runs concurrently with the draft.
+4. **graphics** — the cover. Runs concurrently with the draft. See the design-system rule below.
 5. **critic** — a style editor pass that enforces the rules and rewrites violations.
+6. **figures** — runs on the finished article. The model decides whether any diagram genuinely helps (it may return none) and, for each, picks a template (`stat`, `steps`, `comparison`, `bar`) and fills its text slots plus an `anchor` (the section heading to sit under). `renderFigure()` draws each; they are inserted into the markdown after the anchor heading and also returned in `figures[]` for per-figure download.
 
-The cover comes back as `coverSvg` on the result. The UI shows it inline and rasterizes it to a 2400px PNG in the browser for download (no server-side image library, so nothing native to bundle on serverless). Rule for any future graphics (including in-article diagrams): the model supplies content/structured data only, code owns every coordinate.
+**Design-system rule (critical):** the model NEVER draws SVG or positions anything (it is bad at spatial layout, which produced overlapping garbage). It supplies only content/structured data; deterministic code in `src/design.ts` owns every coordinate, with adaptive font sizing, word wrap, and decoration confined to fixed margins so nothing can overlap or clip. This holds for the cover and every figure. The cover comes back as `coverSvg`; the UI shows all graphics inline and rasterizes them to PNG in the browser for download (no server-side image library, nothing native to bundle on serverless).
 
 The orchestration is plain code; Claude is called only for the cognitive steps. This is deliberate: deterministic control flow, model for judgment.
 
@@ -22,9 +23,10 @@ The pipeline takes an optional `apiKey` per request. The web UI and both endpoin
 
 ## File map
 
-- `src/pipeline.ts` — the agent. The four steps and `generateArticle()`. Each step takes the per-request client.
+- `src/pipeline.ts` — the agent. The six steps and `generateArticle()`. Each step takes the per-request client.
 - `src/voice.ts` — the encoded house style and the em-dash safety net. **This is the part that makes the output the author's, not generic. Treat it as the most important file.** It is meant to lift into a Claude skill later.
 - `src/claude.ts` — `createClient(apiKey?)`, model config, JSON parsing helpers.
+- `src/design.ts` — the visual design system: palette plus deterministic `renderCover()` and `renderFigure()` (stat, steps, comparison, bar). All graphics are rendered here; nothing model-drawn.
 - `src/rateLimit.ts` — per-IP fixed-window rate limiter, dependency-free. Shared by both endpoints.
 - `src/server.ts` — standalone Node server (`/`, `/api/generate`, `/health`), host-agnostic. Serves the UI.
 - `api/generate.ts` — Vercel serverless endpoint, streaming SSE. Uses local http-based types, not `@vercel/node` (removed to drop its CVE-bearing dev deps).
@@ -58,7 +60,7 @@ Long-running hosts (Railway/Render/Fly): build `npm install && npm run build`, s
 
 ## Roadmap (pick these up)
 
-1. **In-article diagrams** — the cover graphic ships (`graphics` step, house palette: coral #FF7A5C, green #5FB78A, lavender #A78ECC, Inter, sharp corners, filled triangle arrowheads; rasterized to 2400px PNG client-side). Next is per-section concept diagrams. If a build ever needs server-side rasterization, use `@resvg/resvg-js` (serverless-safe, embeds fonts), never cairosvg (Python, painful in serverless).
+1. **More figure templates** — cover plus four in-article figures ship (stat, steps, comparison, bar in `src/design.ts`; house palette coral #FF7A5C, green #5FB78A, lavender #A78ECC, Inter, sharp corners, filled triangle arrowheads; rasterized to PNG client-side). Next: timelines, callout quotes, and embedding an Inter subset into the SVG so PNG text is pixel-exact Inter (today PNG falls back to system-ui). If a build ever needs server-side rasterization, use `@resvg/resvg-js` (serverless-safe, embeds fonts), never cairosvg (Python, painful in serverless).
 2. **Companion deliverables** — tweet thread (10 to 12), LinkedIn caption mirroring the intro verbatim, IG/X/WhatsApp variants.
 3. **Async job pattern** — kick off, store, poll. Removes the timeout ceiling so it runs on any plan.
 4. **Global rate limit** — the in-memory per-IP limiter is best-effort on serverless. For hard limits add Vercel Firewall rate limiting or back `rateLimit.ts` with Upstash Redis.
