@@ -46,7 +46,7 @@ vercel --prod
 
 Leave `ANTHROPIC_API_KEY` **unset** on a public deploy so every visitor must bring their own key. Set it only on a private instance where you want a fallback.
 
-Timeouts: the full pipeline takes a couple of minutes. `maxDuration` is 300s in `vercel.json`, which needs a Pro plan. On Hobby (60s cap) the request times out before finishing. To stay on Hobby, deploy to a long-running host instead (Railway, Render, Fly): build `npm install && npm run build`, start `npm start`, no timeout ceiling. `GET /health` returns `{"ok":true}` for health checks.
+Timeouts: the full pipeline takes a couple of minutes. `maxDuration` is 300s in `vercel.json`. With Fluid Compute (on by default), the free Hobby plan allows up to 300s per function, so it fits. Pro raises the ceiling to 800s if you ever need more. If Fluid Compute is off, enable it in Project Settings, otherwise the function is capped lower. You can also deploy to a long-running host with no timeout ceiling (Railway, Render, Fly): build `npm install && npm run build`, start `npm start`. `GET /health` returns `{"ok":true}` for health checks.
 
 ## Configuration
 

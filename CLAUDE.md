@@ -43,7 +43,7 @@ npm run build
 npm start                   # standalone on :3000, serves the UI
 ```
 
-Vercel: `vercel`, then `vercel --prod`. Leave `ANTHROPIC_API_KEY` unset on public deploys. `maxDuration` is 300s (needs Pro; Hobby caps at 60s and the pipeline will time out).
+Vercel: `vercel`, then `vercel --prod`. Leave `ANTHROPIC_API_KEY` unset on public deploys. `maxDuration` is 300s. With Fluid Compute (default on), the free Hobby plan allows up to 300s, so it fits; Pro raises the ceiling to 800s. Make sure Fluid Compute is enabled.
 
 Long-running hosts (Railway/Render/Fly): build `npm install && npm run build`, start `npm start`. No timeout ceiling.
 
