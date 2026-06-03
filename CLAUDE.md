@@ -28,7 +28,7 @@ The outline, draft, and critic steps build their `system` via `cachedSystem(VOIC
 ## File map
 
 - `src/pipeline.ts` — the agent. The six steps and `generateArticle()`. Each step takes the per-request client.
-- `src/voice.ts` — the encoded house style and the em-dash safety net. **This is the part that makes the output the author's, not generic. Treat it as the most important file.** It is meant to lift into a Claude skill later.
+- `src/voice.ts` — the encoded house style and the em-dash safety net. **This is the part that makes the output the author's, not generic. Treat it as the most important file.** Its twin for writing prose directly in Claude Code is `.claude/skills/house-voice/SKILL.md`; keep the two in sync.
 - `src/claude.ts` — `createClient(apiKey?)`, model config, JSON parsing helpers.
 - `src/design.ts` — the visual design system: palette plus deterministic `renderCover()` and `renderFigure()` (stat, steps, comparison, bar). All graphics are rendered here; nothing model-drawn.
 - `src/rateLimit.ts` — per-IP fixed-window rate limiter, dependency-free. Shared by both endpoints.
@@ -68,4 +68,4 @@ Long-running hosts (Railway/Render/Fly): build `npm install && npm run build`, s
 2. **Companion deliverables** — tweet thread (10 to 12), LinkedIn caption mirroring the intro verbatim, IG/X/WhatsApp variants.
 3. **Async job pattern** — kick off, store, poll. Removes the timeout ceiling so it runs on any plan.
 4. **Global rate limit** — the in-memory per-IP limiter is best-effort on serverless. For hard limits add Vercel Firewall rate limiting or back `rateLimit.ts` with Upstash Redis.
-5. **Package `voice.ts` as a Claude skill** so the same rules run inside Claude Code.
+5. **(Done) House voice as a Claude skill** — `.claude/skills/house-voice/SKILL.md` encodes the same rules for writing prose directly in Claude Code. It is the twin of `src/voice.ts`; keep the two in sync when the voice changes. Next: consider sourcing both from one shared rules file so they can never drift, which would also grow the cached `VOICE` prefix past the caching minimum.
