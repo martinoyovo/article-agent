@@ -4,6 +4,12 @@ An open-source agent that researches and writes articles in a fixed house voice.
 
 Bring your own Anthropic API key. The hosted version never stores it. The voice and rules live in `src/voice.ts`, the part that makes the output yours, and it lifts straight into a Claude skill later.
 
+## Demo
+
+<video src="https://github.com/martinoyovo/article-agent/raw/main/docs/demo.mp4" controls></video>
+
+> If the player does not load, [watch the demo here](https://github.com/martinoyovo/article-agent/raw/main/docs/demo.mp4).
+
 ## Use it
 
 Open the web UI, paste your Anthropic API key (it stays in your browser and is sent only with your request), type a topic, and watch the article stream in. You can also call the API directly:
