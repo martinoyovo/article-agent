@@ -21,6 +21,10 @@ The orchestration is plain code; Claude is called only for the cognitive steps. 
 
 The pipeline takes an optional `apiKey` per request. The web UI and both endpoints read it from the `x-anthropic-api-key` header, fall back to the `ANTHROPIC_API_KEY` env var, and never store or log it. This is what makes a public deploy safe: leave the env var unset and every caller spends their own tokens, not yours. `createClient()` in `src/claude.ts` is the single place the key turns into a client.
 
+## Prompt caching
+
+The outline, draft, and critic steps build their `system` via `cachedSystem(VOICE, suffix)` (`src/claude.ts`), which puts a `cache_control` breakpoint on the shared `VOICE` prefix. **This is a deliberate no-op today.** Prompt caching only activates once the cached prefix clears the model minimum (2048 tokens on Sonnet 4.6, 4096 on Haiku 4.5); `VOICE` is ~300 tokens, so the API silently skips caching (`cache_creation_input_tokens` stays 0) with no write premium and no error. The structure is idiomatic and will start caching automatically if `VOICE` grows past the minimum. Caches are model-scoped, and each run makes one unique call per step, so even at size the win would be limited to repeated articles within the 5-minute TTL. Don't add `cache_control` to the research/graphics/figures steps: their prompts are not reused, so caching them yields nothing.
+
 ## File map
 
 - `src/pipeline.ts` — the agent. The six steps and `generateArticle()`. Each step takes the per-request client.

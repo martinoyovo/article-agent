@@ -35,3 +35,22 @@ export function parseJson<T>(raw: string): T {
   if (start >= 0 && end >= 0) s = s.slice(start, end + 1);
   return JSON.parse(s) as T;
 }
+
+// Build a system prompt as cache-friendly content blocks: the stable `prefix`
+// (the shared VOICE block) carries a cache_control breakpoint so repeated
+// same-model calls can reuse it, with the step-specific `suffix` after it.
+//
+// IMPORTANT: prompt caching only activates once the cached prefix exceeds the
+// model minimum (2048 tokens on Sonnet 4.6, 4096 on Haiku 4.5). VOICE is only
+// ~300 tokens today, so this is currently a no-op: the API silently skips
+// caching (usage.cache_creation_input_tokens stays 0), with no write premium
+// and no error. This is the idiomatic structure and will start caching
+// automatically if VOICE ever grows past the minimum (e.g. a fuller
+// house-style guide, or packaging voice.ts as a larger skill). Caches are also
+// model-scoped, so a hit would only occur across calls on the same model.
+export function cachedSystem(prefix: string, suffix: string): Anthropic.TextBlockParam[] {
+  return [
+    { type: "text", text: prefix, cache_control: { type: "ephemeral" } },
+    { type: "text", text: suffix },
+  ];
+}
