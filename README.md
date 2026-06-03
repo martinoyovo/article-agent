@@ -1,6 +1,6 @@
 # article-agent
 
-An open-source agent that researches and writes articles in a fixed house voice. It runs a four-step pipeline: real web research with citations, an outline, a full draft, and a style critic that enforces the rules (no em dashes, inline `[N]` citations, a consistent structure).
+An open-source agent that researches and writes articles in a fixed house voice. It runs a five-step pipeline: real web research with citations, an outline, a full draft, a cover graphic in the house palette, and a style critic that enforces the rules (no em dashes, inline `[N]` citations, a consistent structure).
 
 Bring your own Anthropic API key. The hosted version never stores it. The voice and rules live in `src/voice.ts`, the part that makes the output yours, and it lifts straight into a Claude skill later.
 
@@ -68,7 +68,7 @@ Bring-your-own-key means abuse spends the caller's tokens, not the host's. The r
 
 ## Roadmap
 
-- Graphics step: SVG in the house palette rendered to PNG via `@resvg/resvg-js`.
+- In-article diagrams: per-section concept visuals (the cover graphic already ships).
 - Companion deliverables: tweet thread, LinkedIn caption, platform variants.
 - Async job pattern so it runs on any plan without timeout limits.
 - Package the voice rules as a Claude skill so the same logic runs in Claude Code.

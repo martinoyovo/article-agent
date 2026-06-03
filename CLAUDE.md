@@ -4,12 +4,15 @@ Project context for Claude Code. Read this before making changes.
 
 ## What this is
 
-`article-agent` is an open-source agent that researches and writes articles in the author's house voice. It runs a deterministic four-step pipeline:
+`article-agent` is an open-source agent that researches and writes articles in the author's house voice. It runs a deterministic five-step pipeline:
 
 1. **research** (`src/pipeline.ts`) — real web search via the Anthropic server-side `web_search` tool, returns cited findings with live URLs.
 2. **outline** — shapes the spine in house structure.
 3. **draft** — full article in voice, with inline `[N]` citations.
-4. **critic** — a style editor pass that enforces the rules and rewrites violations.
+4. **graphics** — a self-contained cover SVG in the house palette. Runs concurrently with the draft (both depend only on outline + research). Has a deterministic on-brand fallback so an image always ships. The SVG is sanitized server-side (no script/external refs) since the UI renders it inline.
+5. **critic** — a style editor pass that enforces the rules and rewrites violations.
+
+The cover comes back as `coverSvg` on the result. The UI shows it inline and rasterizes it to a 2400px PNG in the browser for download (no server-side image library, so nothing native to bundle on serverless).
 
 The orchestration is plain code; Claude is called only for the cognitive steps. This is deliberate: deterministic control flow, model for judgment.
 
@@ -55,7 +58,7 @@ Long-running hosts (Railway/Render/Fly): build `npm install && npm run build`, s
 
 ## Roadmap (pick these up)
 
-1. **Graphics step** — generate SVGs in the house palette (coral #FF7A5C, green #5FB78A, lavender #A78ECC, Inter font, sharp corners, filled triangle arrowheads) and render to PNG at 2400px via `@resvg/resvg-js` (serverless-safe, embeds fonts). Do not use cairosvg (Python, painful in serverless).
+1. **In-article diagrams** — the cover graphic ships (`graphics` step, house palette: coral #FF7A5C, green #5FB78A, lavender #A78ECC, Inter, sharp corners, filled triangle arrowheads; rasterized to 2400px PNG client-side). Next is per-section concept diagrams. If a build ever needs server-side rasterization, use `@resvg/resvg-js` (serverless-safe, embeds fonts), never cairosvg (Python, painful in serverless).
 2. **Companion deliverables** — tweet thread (10 to 12), LinkedIn caption mirroring the intro verbatim, IG/X/WhatsApp variants.
 3. **Async job pattern** — kick off, store, poll. Removes the timeout ceiling so it runs on any plan.
 4. **Global rate limit** — the in-memory per-IP limiter is best-effort on serverless. For hard limits add Vercel Firewall rate limiting or back `rateLimit.ts` with Upstash Redis.
